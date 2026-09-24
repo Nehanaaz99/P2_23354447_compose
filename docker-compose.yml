@@ -1,0 +1,45 @@
+services:
+
+  # Docker-in-Docker: private Docker engine that Jenkins uses to build images
+  docker:
+    image: docker:dind
+    container_name: jenkins-docker
+    privileged: true                  # needed to run Docker inside a container
+    environment:
+      DOCKER_TLS_CERTDIR: /certs      # turn on TLS; certificates are created here
+    volumes:
+      - jenkins-docker-certs:/certs/client   # TLS client certificates, shared with Jenkins
+      - jenkins-data:/var/jenkins_home       # same path as Jenkins so build containers see the workspace
+    networks:
+      jenkins:
+        aliases:
+          - docker                    # Jenkins reaches this daemon at tcp://docker:2376
+    command: --storage-driver overlay2
+    restart: unless-stopped
+
+  # Jenkins, built from our Dockerfile
+  jenkins:
+    build: .
+    image: my-jenkins
+    container_name: jenkins
+    depends_on:
+      - docker
+    environment:
+      DOCKER_HOST: tcp://docker:2376  # use DinD, never the server's own Docker
+      DOCKER_CERT_PATH: /certs/client # where the TLS client certificates are
+      DOCKER_TLS_VERIFY: "1"          # only connect over verified TLS
+    ports:
+      - "127.0.0.1:8080:8080"         # web UI only reachable from this server (via SSH tunnel)
+    volumes:
+      - jenkins-data:/var/jenkins_home           # jobs, build logs, plugins, credentials (persistent)
+      - jenkins-docker-certs:/certs/client:ro    # certificates, read-only
+    networks:
+      - jenkins
+    restart: unless-stopped
+
+networks:
+  jenkins:                            # private network for the two containers
+
+volumes:
+  jenkins-data:                       # Jenkins home - survives restarts
+  jenkins-docker-certs:               # TLS certificates
