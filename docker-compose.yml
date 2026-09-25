@@ -10,6 +10,7 @@ services:
     volumes:
       - jenkins-docker-certs:/certs/client   # TLS client certificates, shared with Jenkins
       - jenkins-data:/var/jenkins_home       # same path as Jenkins so build containers see the workspace
+      - jenkins-docker-data:/var/lib/docker  #DinD images, layers and build cache - survive restarts
     networks:
       jenkins:
         aliases:
@@ -29,17 +30,18 @@ services:
       DOCKER_CERT_PATH: /certs/client # where the TLS client certificates are
       DOCKER_TLS_VERIFY: "1"          # only connect over verified TLS
     ports:
-      - "127.0.0.1:8080:8080"         # web UI only reachable from this server (via SSH tunnel)
+      - "127.0.0.1:8080:8080"         # web UI only reachable from this server via SSH tunnel
     volumes:
-      - jenkins-data:/var/jenkins_home           # jobs, build logs, plugins, credentials (persistent)
+      - jenkins-data:/var/jenkins_home       # jobs, build logs, plugins, credentials
       - jenkins-docker-certs:/certs/client:ro    # certificates, read-only
     networks:
       - jenkins
     restart: unless-stopped
 
 networks:
-  jenkins:                            # private network for the two containers
+  jenkins:                       # private network for the two containers
 
 volumes:
   jenkins-data:                       # Jenkins home - survives restarts
   jenkins-docker-certs:               # TLS certificates
+  jenkins-docker-data:                # DinD image storage 
